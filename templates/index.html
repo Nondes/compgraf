@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Сжимальщик видео</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --gap: 14px; --fg:#111; --muted:#666; --border:#e8e8e8; --bg:#fafafa; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:var(--fg); background:#fff; }
+    header { background: var(--bg); border-bottom:1px solid var(--border); }
+    .wrap { max-width: 960px; margin:0 auto; padding: 22px 16px; }
+    h1 { margin:0 0 6px; font-size: 28px; }
+    p.lead { margin: 6px 0 0; color: var(--muted); }
+    .card { border:1px solid var(--border); border-radius:12px; padding:18px; margin:16px 0; }
+    h2 { margin-top:0; font-size: 20px; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+    .grid-4 { display:grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
+    label { font-weight: 700; display:block; margin-bottom:6px; }
+    input[type="number"], input[type="text"], select {
+      width:100%; padding:10px 12px; border:1px solid #dcdcdc; border-radius:10px;
+    }
+    input[type="file"] { width:100%; }
+    small { display:block; color:var(--muted); margin-top:6px; line-height:1.4; }
+    .actions { display:flex; gap:var(--gap); justify-content:flex-end; align-items:center; }
+    button { appearance:none; border:0; background:#111; color:#fff; padding:10px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .btn-secondary { background:#f2f2f2; color:#111; }
+    details { margin-top:10px; }
+    summary { cursor:pointer; color:#333; }
+    .hidden { display:none; }
+    .muted { color: var(--muted); }
+    @media (max-width: 900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Сжимальщик видео</h1>
+      <p class="lead">Загрузите видео и программа найдёт статичные места и аккуратно их вырежет. По умолчанию склейки мягкие, без чёрных экранов.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <form method="post" action="/upload" enctype="multipart/form-data" id="form">
+
+      <section class="card">
+        <h2>1) Файл и общий вывод</h2>
+        <div class="grid-2">
+          <div>
+            <label for="file">Видео-файл *</label>
+            <input id="file" name="file" type="file" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm" required />
+            <small>Подходит: MP4, MOV, MKV, AVI, M4V, WebM. Ограничение по размеру устанавливается на сервере.</small>
+          </div>
+          <div>
+            <label for="target_fps">Частота кадров на выходе (FPS)</label>
+            <input id="target_fps" name="target_fps" type="number" min="1" max="120" step="1" placeholder="авто" />
+            <small>Пусто как в исходнике. Рекомендация: 25–30. Диапазон: 1–120.</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2) Переходы между фрагментами</h2>
+        <div class="grid-2">
+          <div>
+            <label for="transition">Тип перехода</label>
+            <select id="transition" name="transition">
+              <option value="crossfade" selected>Мягкий переход (crossfade)</option>
+              <option value="cut">Жёсткая склейка (cut)</option>
+            </select>
+            <small>«Мягкий» - убирает чёрные провалы. «Жёсткий» - мгновенный стык без плавности.</small>
+          </div>
+          <div id="xfadeWrap">
+            <label for="xfade_duration">Длительность мягкого перехода, сек</label>
+            <input id="xfade_duration" name="xfade_duration" type="number" step="0.01" min="0.02" max="1.00" value="0.12" />
+            <small>Обычно 0,08–0,15 сек выглядит естественно. Диапазон: 0,02–1,00.</small>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="scene_padding">Запас по краям фрагментов, сек</label>
+            <input id="scene_padding" name="scene_padding" type="number" step="0.01" min="0.00" max="1.00" value="0.12" />
+            <small>Чуть расширяет каждый фрагмент, чтобы переход не резал речь/движение. Диапазон: 0,00–1,00.</small>
+          </div>
+          <div>
+            <label for="crf">Качество (CRF)</label>
+            <input id="crf" name="crf" type="number" step="1" min="10" max="40" value="22" />
+            <small>Чем меньше число - тем выше качество и больше файл. Рекомендуем 18–28. Диапазон: 10–40.</small>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="preset">Скорость обработки (Preset)</label>
+            <select id="preset" name="preset">
+              <option>ultrafast</option>
+              <option>superfast</option>
+              <option>veryfast</option>
+              <option selected>fast</option>
+              <option>medium</option>
+              <option>slow</option>
+              <option>veryslow</option>
+            </select>
+            <small>Медленнее - лучше сжатие при том же качестве, но дольше по времени.</small>
+          </div>
+          <div>
+            <label for="fade_duration">Fade на сегментах (для «жёсткой» склейки), сек</label>
+            <input id="fade_duration" name="fade_duration" type="number" step="0.01" min="0.00" max="1.00" value="0.00" />
+            <small>Не используется при «мягком» переходе. Можно задать 0,05–0,10 сек, если нужен короткий затемняющий стык.</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3) Поиск «статичных» участков</h2>
+
+        <div class="grid-2">
+          <div>
+            <label for="scaled_width">Ширина кадра для анализа, пикс.</label>
+            <input id="scaled_width" name="scaled_width" type="number" step="1" min="64" max="1920" value="320" />
+            <small>Меньше — быстрее анализ, часто хватает 256–320. Диапазон: 64–1920.</small>
+          </div>
+          <div>
+            <label for="flat_ratio">Процент «похожих» кадров</label>
+            <input id="flat_ratio" name="flat_ratio" type="number" step="0.01" min="0.50" max="1.00" value="0.85" />
+            <small>Сколько кадров в окне должны быть почти одинаковыми, чтобы считать участок «статичным». Обычно 0,80–0,90.</small>
+          </div>
+        </div>
+
+        <div class="grid-4">
+          <div>
+            <label for="run_sim_threshold">Чувствительность к похожести</label>
+            <input id="run_sim_threshold" name="run_sim_threshold" type="number" step="1" min="1" max="64" value="6" />
+            <small>Больше - строже. Если пропускает «статичные кадры», уменьшите значение. Диапазон: 1–64.</small>
+          </div>
+          <div>
+            <label for="window_frames">Размер окна, кадров</label>
+            <input id="window_frames" name="window_frames" type="number" step="1" min="3" max="61" value="9" />
+            <small>Сколько соседних кадров сравнивать сразу. Больше - стабильнее, но медленнее. Диапазон: 3–61.</small>
+          </div>
+          <div>
+            <label for="min_flat_sec">Мин. длительность «статичных моментов», сек</label>
+            <input id="min_flat_sec" name="min_flat_sec" type="number" step="0.01" min="0.20" max="10.00" value="0.70" />
+            <small>Короткие «статичные момменты» игнорируются. Диапазон: 0,20–10,00.</small>
+          </div>
+          <div>
+            <label for="keep_margin_sec">Оставить по краям, сек</label>
+            <input id="keep_margin_sec" name="keep_margin_sec" type="number" step="0.01" min="0.00" max="2.00" value="0.25" />
+            <small>Столько времени оставляем в начале и в конце «статичного момента», вырезается только середина. Диапазон: 0,00–2,00.</small>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div>
+            <label for="min_keep_duration">Мин. длительность сохраняемого фрагмента, сек</label>
+            <input id="min_keep_duration" name="min_keep_duration" type="number" step="0.01" min="0.10" max="10.00" value="0.35" />
+            <small>Слишком короткие фрагменты удаляются. Диапазон: 0,10–10,00.</small>
+          </div>
+          <div>
+            <label for="merge_gap">Объединять, если пауза меньше, сек</label>
+            <input id="merge_gap" name="merge_gap" type="number" step="0.01" min="0.00" max="2.00" value="0.05" />
+            <small>Если между двумя фрагментами пауза короче этого значения - они склеиваются. Диапазон: 0,00–2,00.</small>
+          </div>
+          <div>
+            <label for="analysis_fps_hint">FPS анализа</label>
+            <input id="analysis_fps_hint" type="text" disabled value="Определяется автоматически, обычно не выше 15 FPS" />
+            <small>Мы ограничиваем частоту кадров для анализа, чтобы он шёл быстрее. Это не влияет на качество вывода.</small>
+          </div>
+        </div>
+
+        <details>
+          <summary>Подсказки, если результат «кривой»</summary>
+          <small>
+            • Удаляет лишнее? Увеличьте «Мин. длительность статичных моментов» и «Оставить по краям». <br>
+            • Пропускает длинные паузы? Уменьшите «Чувствительность к похожести» или увеличьте «Процент похожих кадров». <br>
+            • Грубые стыки? Включите «Мягкий переход» и поставьте «Длительность» 0,10–0,15 сек. <br>
+            • Большой размер файла? Поднимите CRF (например, 24–26) или уменьшите FPS вывода до 25–30.
+          </small>
+        </details>
+      </section>
+
+      <section class="actions">
+        <button type="button" class="btn-secondary" id="resetBtn">Вернуть настройки</button>
+        <button type="submit">Запустить обработку</button>
+      </section>
+    </form>
+  </main>
+
+  <script>
+    const defaults = {
+      target_fps: '',
+      transition: 'crossfade',
+      xfade_duration: 0.12,
+      scene_padding: 0.12,
+      crf: 22,
+      preset: 'fast',
+      fade_duration: 0.00,
+      scaled_width: 320,
+      flat_ratio: 0.85,
+      run_sim_threshold: 6,
+      window_frames: 9,
+      min_flat_sec: 0.70,
+      keep_margin_sec: 0.25,
+      min_keep_duration: 0.35,
+      merge_gap: 0.05
+    };
+
+    function applyDefaults() {
+      for (const [k, v] of Object.entries(defaults)) {
+        const el = document.querySelector(`[name="${k}"]`);
+        if (!el) continue;
+        if (el.tagName === 'SELECT') { el.value = v; }
+        else { el.value = v; }
+      }
+      toggleCrossfadeUI();
+    }
+
+    function toggleCrossfadeUI() {
+      const t = document.getElementById('transition').value;
+      const wrap = document.getElementById('xfadeWrap');
+      const fadeDur = document.getElementById('fade_duration');
+      if (t === 'crossfade') {
+        wrap.classList.remove('hidden');
+        fadeDur.disabled = true;
+      } else {
+        wrap.classList.add('hidden');
+        fadeDur.disabled = false;
+      }
+    }
+
+    document.getElementById('transition').addEventListener('change', toggleCrossfadeUI);
+    document.getElementById('resetBtn').addEventListener('click', applyDefaults);
+    document.addEventListener('DOMContentLoaded', applyDefaults);
+
+    document.getElementById('form').addEventListener('submit', (e) => {
+      const file = document.getElementById('file');
+      if (!file.files || !file.files[0]) {
+        e.preventDefault();
+        alert('Пожалуйста, выберите видео-файл.');
+        return;
+      }
+      const xfade = parseFloat(document.getElementById('xfade_duration').value);
+      if (!isNaN(xfade) && (xfade < 0.02 || xfade > 1.00)) {
+        e.preventDefault();
+        alert('Длительность мягкого перехода должна быть от 0,02 до 1,00 секунды.');
+      }
+    });
+  </script>
+</body>
+</html>

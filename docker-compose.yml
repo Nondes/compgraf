@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  video-compressor:
+    build: .
+    container_name: video-compressor
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    restart: unless-stopped
